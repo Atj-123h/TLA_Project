@@ -66,6 +66,8 @@ class TuringMachine:
         self.reject_state = reject_state
         self.blank_symbol = blank_symbol
 
+        self.finite = False
+
     def run(self, input_):
         """Execute the Turing machine for a particular input.
 
@@ -132,18 +134,33 @@ class TuringMachine:
                 if right:
                     symbol = right.pop(0)
                 else:
-                    symbol = self.blank_symbol
+                    # symbol = self.blank_symbol
+                    if self.finite:
+                        if left:
+                            symbol = left.pop()
+                        else:
+                            symbol = self.blank_symbol
+                    else:
+                        symbol = self.blank_symbol
+                        
             elif direction == 'L':
-                if not left:
-                    logging.warning("Crossing left boundary of singly-infinite tape.")
+                # if not left:
+                #     logging.warning("Crossing left boundary of singly-infinite tape.")
 
                 right.insert(0, symbol)
 
                 if left:
                     symbol = left.pop(0)
                 else:
-                    symbol = self.blank_symbol
-            
+                    # symbol = self.blank_symbol
+                    if self.finite:
+                        if right:
+                            symbol = right.pop()
+                        else:
+                            symbol = self.blank_symbol
+                    else:
+                        symbol = self.blank_symbol
+
             state = new_state
             yield None, configuration
 
