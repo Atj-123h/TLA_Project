@@ -60,7 +60,11 @@ class TuringMachine:
     def __init__(self, transitions, start_state='q0', accept_state='qa', reject_state='qr', blank_symbol=''):
         # TODO: Implement the constructor. Initialize transitions, start_state, accept_state,
         # reject_state, blank_symbol, and any other helpful structures.
-        pass
+        self.transitions = transitions
+        self.start_state = start_state
+        self.accept_state = accept_state
+        self.reject_state = reject_state
+        self.blank_symbol = blank_symbol
 
     def run(self, input_):
         """Execute the Turing machine for a particular input.
@@ -86,7 +90,62 @@ class TuringMachine:
         # 3. Read transitions and update state, write symbols, and move the head ('L' or 'R').
         # 4. Handle tape expansion dynamically for both left and right directions (double-sided infinite tape).
         # 5. Log a warning using logging.warning() if the singly-infinite tape boundary is crossed before Part III.
-        pass
+        if isinstance(input_, str):
+            input_ = list(input_)
+
+        left = []
+        if input_:
+            symbol = input_[0]
+            right = input_[1:]
+        else:
+            symbol = self.blank_symbol
+            right = []
+        
+        state = self.start_state
+
+        while True:
+            configuration = {
+                'state': state,
+                'left_hand_side': left.copy(),
+                'symbol': symbol,
+                'right_hand_side': right.copy()
+            }
+
+            if state == self.accept_state:
+                yield 'Accept', configuration
+                return
+            
+            if state == self.reject_state:
+                yield 'Reject', configuration
+                return
+            
+            key = (state, symbol)
+            if key not in self.transitions:
+                yield 'Reject', configuration
+                return
+            
+            new_state, written_symbol, direction = self.transitions[key]
+            symbol = written_symbol
+            if direction == 'R':
+                left.insert(0, symbol)
+
+                if right:
+                    symbol = right.pop(0)
+                else:
+                    symbol = self.blank_symbol
+            elif direction == 'L':
+                if not left:
+                    logging.warning("Crossing left boundary of singly-infinite tape.")
+
+                right.insert(0, symbol)
+
+                if left:
+                    symbol = left.pop(0)
+                else:
+                    symbol = self.blank_symbol
+            
+            state = new_state
+            yield None, configuration
 
     def accepts(self, input_, step_limit=100):
         """Check whether the Turing machine accepts a string.
@@ -98,7 +157,15 @@ class TuringMachine:
         """
         # TODO: Run the generator up to step_limit and check the action of the final yielded state.
         # Remember to log a warning if the step_limit is reached without halting.
-        pass
+        for action, i in islice(self.run(input_), step_limit):
+            if action == 'Accept':
+                return True
+            if action == 'Reject':
+                return False
+            
+        logging.warning('Step limit reached without halting.')
+        return None
+
 
     def rejects(self, input_, **kwargs):
         """Check whether the Turing machine rejects a string.
@@ -107,7 +174,12 @@ class TuringMachine:
         :return: True if the machine rejects the string, False if it accepts.
         """
         # TODO: Determine rejection by checking if accepts() returns False.
-        pass
+        rej_determination = self.accepts(input_, **kwargs)
+        if rej_determination is None:
+            return None
+        
+        return not rej_determination
+
 
     def debug(self, input_, step_limit=100, colored=False):
         """Print the execution configuration of the machine per transition for debugging.
@@ -118,4 +190,13 @@ class TuringMachine:
         """
         # TODO: Loop over the steps yielded by run() up to step_limit and print the tape configuration.
         # E.g., print the state and the tape with the head highlighted in brackets like: left[symbol]right
-        pass
+        for i, (action, configuration) in enumerate(islice(self.run(input_), step_limit)):
+            left = ''.join(reversed(configuration['left_hand_side']))
+            symbol = configuration['symbol'] or '$'
+            right = ''.join(configuration['right_hand_side'])
+
+            print(f'{i:03d}: {left}["{symbol}"]{right} | ({configuration["state"]})')
+            if action:
+                print('Result:', action)
+                break
+
