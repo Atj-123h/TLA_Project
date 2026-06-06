@@ -9,6 +9,11 @@ transitions = {
         # The value will be the triple (next state, character to write, move head L or R)
         # such as ('q0', '1'): ('q1', '0', 'R'), which says if current state is q0 and 1 encountered
         # then transition to state q1, write a 0 and move head right.
+        ('q0', '1'): ('q0', '1', 'R'),
+        ('q0', '0'): ('q1', '1', 'R'),
+        ('q1', '1'): ('q1', '1', 'R'),
+        ('q1', ''): ('q2', '', 'L'),
+        ('q2', '1'): ('qa', '', 'R'),
 }
 
 if __name__ == "__main__":
