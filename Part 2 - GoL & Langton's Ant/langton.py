@@ -20,7 +20,7 @@ class LangtonsAnt:
     3. Ensure wrapping at the boundaries (toroidal grid).
     """
 
-    def __init__(self, N, ant_position, rules):
+    def __init__(self, N, ant_position, rules, start_dir='U'):
         """
         Initialize the Langton's Ant simulation.
         
@@ -31,7 +31,16 @@ class LangtonsAnt:
                           Format: {current_color: (next_color, turn_direction)}
         """
         # Student TODO: Implement initialization
-        pass
+        self.N = N
+        self.grid = np.zeros((N, N), dtype=int)
+        self.ant_position = ant_position
+        self.row, self.col = ant_position
+        self.rules = rules
+        self.directions = ['U', 'R', 'D', 'L']
+        if start_dir in self.directions:
+            self.dir_index = self.directions.index(start_dir)
+        else:
+            self.dir_index = 0
 
     def get_states(self):
         """
@@ -41,7 +50,7 @@ class LangtonsAnt:
             np.ndarray: The NxN cellular grid.
         """
         # Student TODO: Return grid state
-        pass
+        return self.grid
 
     def get_current_position(self):
         """
@@ -51,14 +60,31 @@ class LangtonsAnt:
             tuple: Current coordinates of the ant.
         """
         # Student TODO: Return current position
-        pass
+        return (self.row, self.col)
 
     def step(self):
         """
         Perform a single simulation step following the ruleset.
         """
         # Student TODO: Implement the ant's movement and cell state updates
-        pass
+        current_color = self.grid[self.row, self.col]
+        next_color, turn = self.rules[current_color]
+        self.grid[self.row, self.col] = next_color
+        
+        if turn == 'R':
+            self.dir_index = (self.dir_index + 1)%4
+        else:
+            self.dir_index = (self.dir_index - 1)%4
+        
+        direction = self.directions[self.dir_index]
+        if direction == 'U':
+            self.row = (self.row - 1)%self.N
+        elif direction == 'D':
+            self.row = (self.row + 1) % self.N
+        elif direction == 'L':
+            self.col = (self.col - 1) % self.N
+        elif direction == 'R':
+            self.col = (self.col + 1) % self.N    
 
     def update(self):
         """
