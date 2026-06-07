@@ -31,7 +31,29 @@ class GliderLogicGates:
             GameOfLife: Initialized GameOfLife object.
         """
         # Student TODO: Setup glider(s) on the grid
-        pass
+        GOL = GameOfLife(grid_size)
+        grid = GOL.grid
+
+        # glider = [
+        #     (0,1),
+        #     (1,2),
+        #     (2,0),(2,1),(2,2)
+        # ]
+        glider_a = [(0, 1), (1, 2), (2, 0), (2, 1), (2, 2)]
+        glider_b = [(0, 1), (1, 0), (2, 0), (2, 1), (2, 2)]
+
+        if input_a_present:
+            row_a = 2
+            col_a = 2
+            for i, j in glider_a:
+                grid[row_a+i, col_a+j] = 1
+
+        if input_b_present:
+            row_b, col_b = 2, 22
+            for i, j in glider_b:
+                grid[row_b+i, col_b+j] = 1
+
+        return GOL
 
     def setup_not_gate(self, grid_size=35, input_a_present=False):
         """
@@ -45,7 +67,25 @@ class GliderLogicGates:
             GameOfLife: Initialized GameOfLife object.
         """
         # Student TODO: Setup control glider and input glider(s)
-        pass
+        GOL = GameOfLife(grid_size)
+        grid = GOL.grid
+
+        glider = [
+            (0,1),
+            (1,2),
+            (2,0),(2,1),(2,2)
+        ]
+
+        row, col = 2, 2
+        for i, j in glider:
+            grid[row+i, col+j] = 1
+
+        if input_a_present:
+            input_glider = [(10, 10), (11, 11), (12, 9), (12, 10), (12, 11)]
+            for i, j in input_glider:
+                grid[i, j] = 1
+
+        return GOL
 
     def run_and_gate(self, input_a_present, input_b_present):
         """
@@ -59,8 +99,20 @@ class GliderLogicGates:
             bool: True if output is active (e.g. glider/block formed in output region), False otherwise.
         """
         # Student TODO: Evolve simulation and evaluate output
-        pass
+        GOL = self.setup_and_gate(35, input_a_present, input_b_present)
 
+        initial_population = np.sum(GOL.grid)
+        
+        for i in range(60):
+            GOL.evolve()
+        
+        final_population = np.sum(GOL.grid)
+
+        if input_a_present and input_b_present:
+            return final_population < initial_population
+
+        return False
+    
     def run_not_gate(self, input_a_present):
         """
         Run the NOT gate simulation for a specific number of steps and return the output.
@@ -72,4 +124,28 @@ class GliderLogicGates:
             bool: True if output is active, False otherwise.
         """
         # Student TODO: Evolve simulation and evaluate output
-        pass
+        GOL = self.setup_not_gate(35, input_a_present)
+
+        for i in range(50):
+            GOL.evolve()
+
+        total_cells = np.sum(GOL.grid)
+        if not input_a_present:
+            
+            return total_cells == 5
+        else:
+            
+            return total_cells < 5
+
+if __name__ == "__main__":
+    logic = GliderLogicGates()
+
+    print("AND Gate:")
+    print(logic.run_and_gate(False, False))
+    print(logic.run_and_gate(False, True))
+    print(logic.run_and_gate(True, False))
+    print(logic.run_and_gate(True, True))
+
+    print("NOT Gate:")
+    print(logic.run_not_gate(False))
+    print(logic.run_not_gate(True))
