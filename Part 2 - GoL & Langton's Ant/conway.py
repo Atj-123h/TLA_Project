@@ -21,7 +21,67 @@ def parse_pattern(filepath):
         tuple: (width, height, list of (r, c) offsets of live cells)
     """
     # Student TODO: Implement parser here
-    pass
+    live_cells = []
+    if filepath.endswith('.cells'):
+        lines = []
+        with open(filepath, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('!'):
+                    continue
+
+                lines.append(line)
+
+            height = len(lines)
+            width = max(len(line) for line in lines)
+
+            for i, line in enumerate(lines):
+                for j, charr in enumerate(line):
+                    if charr == 'O' or charr == 'o':
+                        live_cells.append((i, j))
+
+            return width, height, live_cells 
+
+    elif filepath.endswith('.rle'):
+        with open(filepath, 'r') as f:
+            lines = [line.strip() for line in f if line.strip()]
+        
+        header = lines[0]
+        parts = header.split(',')
+        width = int(parts[0].split('=')[1].strip())
+        height = int(parts[1].split('=')[1].strip())
+
+        rle_data = ''.join(lines[1:])
+        row = 0
+        col = 0
+        number = ""
+        for charr in rle_data:
+
+            if charr.isdigit():
+                number += charr
+
+            elif charr in ['o', 'b']:
+                count = int(number) if number else 1
+                number = ""
+
+                if charr == 'o': 
+                    for i in range(count):
+                        live_cells.append((row, col))
+                        col += 1
+                else:  
+                    col += count
+
+            elif charr == '$' or charr == '.':  
+                count = int(number) if number else 1
+                number = ""
+                row += count
+                col = 0
+
+            elif charr == '!': 
+                break
+
+        return width, height, live_cells
+        
 
 
 class GameOfLife:
@@ -65,8 +125,24 @@ class GameOfLife:
             np.ndarray: The next 2D grid of states.
         """
         # Student TODO: Implement fast 2D convolution method
-        pass
+        if self.finite:
+            boundary = 'fill'
+        else:
+            boundary = 'wrap'
+        
+        neighbors = signal.convolve2d(
+            grid,
+            self.neighborhood,
+            mode='same',
+            boundary=boundary
+        )
 
+        new_grid = np.zeros_like(grid)
+        new_grid[(grid == 1) & ((neighbors == 2 )| (neighbors == 3))] = 1
+        new_grid[(grid == 0) & (neighbors == 3)] = 1
+        
+        return new_grid
+    
     def evolve(self):
         """
         Given the current states of the cells, apply the GoL rules:
@@ -84,7 +160,37 @@ class GameOfLife:
             # through the cells cell-by-cell. Handle self.finite wrapping appropriately.
             
             # Student TODO: Implement slow update cell-by-cell logic here
-            pass
+            new_grid = np.zeros_like(self.grid)
+
+            for row in range(self.rows):
+                for col in range(self.cols):
+                    neighbors = 0
+
+                    for i in [-1,0,1]:
+                        for j in [-1,0,1]:
+                            if i == 0 and j == 0:
+                                continue
+
+                            new_r = row + i
+                            new_c = col + j
+
+                            if self.finite:
+                                if (0 <= new_r < self.rows) and (0 <= new_c < self.cols):
+                                    neighbors += self.grid[new_r, new_c]
+                            else:
+                                new_r %= self.rows
+                                new_c %= self.cols
+                                neighbors += self.grid[new_r, new_c]
+                            
+                    cell = self.grid[row, col]
+                    if cell == 1:
+                        if neighbors == 2 or neighbors == 3:
+                            new_grid[row, col] = 1
+                    else:
+                        if neighbors == 3:
+                            new_grid[row, col] = 1
+                    
+            self.grid = new_grid
 
     def insertBlinker(self, index=(0, 0)):
         '''
@@ -110,50 +216,101 @@ class GameOfLife:
         The current glider gun pattern is broken. Leave the broken array in the code 
         and instruct the student to debug and fix the coordinates so it loops infinitely.
         '''
-        self.grid[index[0] + 1, index[1] + 26] = self.aliveValue
+        # self.grid[index[0] + 1, index[1] + 26] = self.aliveValue
 
-        self.grid[index[0] + 2, index[1] + 24] = self.aliveValue
-        self.grid[index[0] + 2, index[1] + 26] = self.aliveValue
+        # self.grid[index[0] + 2, index[1] + 24] = self.aliveValue
+        # self.grid[index[0] + 2, index[1] + 26] = self.aliveValue
 
-        self.grid[index[0] + 3, index[1] + 14] = self.aliveValue
-        self.grid[index[0] + 3, index[1] + 15] = self.aliveValue
-        self.grid[index[0] + 3, index[1] + 22] = self.aliveValue
-        self.grid[index[0] + 3, index[1] + 23] = self.aliveValue
-        self.grid[index[0] + 3, index[1] + 36] = self.aliveValue
-        self.grid[index[0] + 3, index[1] + 37] = self.aliveValue
+        # self.grid[index[0] + 3, index[1] + 14] = self.aliveValue
+        # self.grid[index[0] + 3, index[1] + 15] = self.aliveValue
+        # self.grid[index[0] + 3, index[1] + 22] = self.aliveValue
+        # self.grid[index[0] + 3, index[1] + 23] = self.aliveValue
+        # self.grid[index[0] + 3, index[1] + 36] = self.aliveValue
+        # self.grid[index[0] + 3, index[1] + 37] = self.aliveValue
 
-        self.grid[index[0] + 4, index[1] + 13] = self.aliveValue
-        self.grid[index[0] + 4, index[1] + 17] = self.aliveValue
-        self.grid[index[0] + 4, index[1] + 22] = self.aliveValue
-        self.grid[index[0] + 4, index[1] + 23] = self.aliveValue
-        self.grid[index[0] + 4, index[1] + 36] = self.aliveValue
-        self.grid[index[0] + 4, index[1] + 37] = self.aliveValue
+        # self.grid[index[0] + 4, index[1] + 13] = self.aliveValue
+        # self.grid[index[0] + 4, index[1] + 17] = self.aliveValue
+        # self.grid[index[0] + 4, index[1] + 22] = self.aliveValue
+        # self.grid[index[0] + 4, index[1] + 23] = self.aliveValue
+        # self.grid[index[0] + 4, index[1] + 36] = self.aliveValue
+        # self.grid[index[0] + 4, index[1] + 37] = self.aliveValue
 
-        self.grid[index[0] + 5, index[1] + 1 + 1] = self.aliveValue
-        self.grid[index[0] + 5, index[1] + 2 + 1] = self.aliveValue
-        self.grid[index[0] + 5, index[1] + 12] = self.aliveValue
-        self.grid[index[0] + 5, index[1] + 18] = self.aliveValue
-        self.grid[index[0] + 5, index[1] + 22] = self.aliveValue
-        self.grid[index[0] + 5, index[1] + 23] = self.aliveValue
+        # # self.grid[index[0] + 5, index[1] + 1 + 1] = self.aliveValue
+        # # self.grid[index[0] + 5, index[1] + 2 + 1] = self.aliveValue
+        # self.grid[index[0] + 5, index[1] + 1] = self.aliveValue
+        # self.grid[index[0] + 5, index[1] + 2] = self.aliveValue
+        # self.grid[index[0] + 5, index[1] + 12] = self.aliveValue
+        # self.grid[index[0] + 5, index[1] + 18] = self.aliveValue
+        # self.grid[index[0] + 5, index[1] + 22] = self.aliveValue
+        # self.grid[index[0] + 5, index[1] + 23] = self.aliveValue
 
-        self.grid[index[0] + 6, index[1] + 1 + 1] = self.aliveValue
-        self.grid[index[0] + 6, index[1] + 2 + 1] = self.aliveValue
-        self.grid[index[0] + 6, index[1] + 12] = self.aliveValue
-        self.grid[index[0] + 6, index[1] + 16] = self.aliveValue
-        self.grid[index[0] + 6, index[1] + 18] = self.aliveValue
-        self.grid[index[0] + 6, index[1] + 19] = self.aliveValue
-        self.grid[index[0] + 6, index[1] + 24] = self.aliveValue
-        self.grid[index[0] + 6, index[1] + 26] = self.aliveValue
+        # # self.grid[index[0] + 6, index[1] + 1 + 1] = self.aliveValue
+        # # self.grid[index[0] + 6, index[1] + 2 + 1] = self.aliveValue
+        # self.grid[index[0] + 6, index[1] + 1] = self.aliveValue
+        # self.grid[index[0] + 6, index[1] + 2] = self.aliveValue
+        # self.grid[index[0] + 6, index[1] + 12] = self.aliveValue
+        # self.grid[index[0] + 6, index[1] + 16] = self.aliveValue
+        # self.grid[index[0] + 6, index[1] + 18] = self.aliveValue
+        # self.grid[index[0] + 6, index[1] + 19] = self.aliveValue
+        # self.grid[index[0] + 6, index[1] + 24] = self.aliveValue
+        # self.grid[index[0] + 6, index[1] + 26] = self.aliveValue
 
-        self.grid[index[0] + 7, index[1] + 12] = self.aliveValue
-        self.grid[index[0] + 7, index[1] + 18] = self.aliveValue
-        self.grid[index[0] + 7, index[1] + 26] = self.aliveValue
+        # self.grid[index[0] + 7, index[1] + 12] = self.aliveValue
+        # self.grid[index[0] + 7, index[1] + 18] = self.aliveValue
+        # self.grid[index[0] + 7, index[1] + 26] = self.aliveValue
 
-        self.grid[index[0] + 8, index[1] + 13] = self.aliveValue
-        self.grid[index[0] + 8, index[1] + 17] = self.aliveValue
+        # self.grid[index[0] + 8, index[1] + 13] = self.aliveValue
+        # self.grid[index[0] + 8, index[1] + 17] = self.aliveValue
 
-        self.grid[index[0] + 9, index[1] + 14] = self.aliveValue
-        self.grid[index[0] + 9, index[1] + 15] = self.aliveValue
+        # self.grid[index[0] + 9, index[1] + 14] = self.aliveValue
+        # self.grid[index[0] + 9, index[1] + 15] = self.aliveValue
+
+
+        r, c = index
+        self.grid[r, c + 24] = self.aliveValue
+
+        self.grid[r + 1, c + 22] = self.aliveValue
+        self.grid[r + 1, c + 24] = self.aliveValue
+
+        self.grid[r + 2, c + 12] = self.aliveValue
+        self.grid[r + 2, c + 13] = self.aliveValue
+        self.grid[r + 2, c + 20] = self.aliveValue
+        self.grid[r + 2, c + 21] = self.aliveValue
+        self.grid[r + 2, c + 34] = self.aliveValue
+        self.grid[r + 2, c + 35] = self.aliveValue
+
+        self.grid[r + 3, c + 11] = self.aliveValue
+        self.grid[r + 3, c + 15] = self.aliveValue
+        self.grid[r + 3, c + 20] = self.aliveValue
+        self.grid[r + 3, c + 21] = self.aliveValue
+        self.grid[r + 3, c + 34] = self.aliveValue
+        self.grid[r + 3, c + 35] = self.aliveValue
+
+        self.grid[r + 4, c + 0] = self.aliveValue
+        self.grid[r + 4, c + 1] = self.aliveValue
+        self.grid[r + 4, c + 10] = self.aliveValue
+        self.grid[r + 4, c + 16] = self.aliveValue
+        self.grid[r + 4, c + 20] = self.aliveValue
+        self.grid[r + 4, c + 21] = self.aliveValue
+
+        self.grid[r + 5, c + 0] = self.aliveValue
+        self.grid[r + 5, c + 1] = self.aliveValue
+        self.grid[r + 5, c + 10] = self.aliveValue
+        self.grid[r + 5, c + 14] = self.aliveValue
+        self.grid[r + 5, c + 16] = self.aliveValue
+        self.grid[r + 5, c + 17] = self.aliveValue
+        self.grid[r + 5, c + 22] = self.aliveValue
+        self.grid[r + 5, c + 24] = self.aliveValue
+
+        self.grid[r + 6, c + 10] = self.aliveValue
+        self.grid[r + 6, c + 16] = self.aliveValue
+        self.grid[r + 6, c + 24] = self.aliveValue
+
+        self.grid[r + 7, c + 11] = self.aliveValue
+        self.grid[r + 7, c + 15] = self.aliveValue
+
+        self.grid[r + 8, c + 12] = self.aliveValue
+        self.grid[r + 8, c + 13] = self.aliveValue
 
     def insertFromFile(self, filename, index=((0, 0))):
         '''
