@@ -99,10 +99,11 @@ beaver_programs = [
     },
     {
         # TODO: Implement 3-state Busy Beaver program
+
         'a0': ('b', '1', 'r'),
         'a1': ('h', '1', 'r'),
-        'b0': ('b', '1', 'l'),
-        'b1': ('c', '0', 'r'),
+        'b0': ('c', '0', 'r'),  
+        'b1': ('b', '1', 'r'),  
         'c0': ('c', '1', 'l'),
         'c1': ('a', '1', 'l')
     },
