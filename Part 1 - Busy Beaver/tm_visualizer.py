@@ -3,10 +3,7 @@ import math
 import random
 import pygame
 from turing_machine import TuringMachine
-
-# =========================================================
-# CONFIGURE YOUR MACHINE HERE
-# =========================================================
+import os
 
 TRANSITIONS = {
     ('A', '0'): ('B', '1', 'R'),
@@ -20,14 +17,28 @@ TRANSITIONS = {
 INPUT_TAPE = ""
 START_STATE = 'A'
 HALT_STATE = 'Z'
+# BLANK = '□'
 BLANK = '0'
-
-# =========================================================
-# PYGAME INIT
-# =========================================================
 
 pygame.init()
 pygame.font.init()
+
+pygame.mixer.init()
+
+def generate_beep(freq=700, duration=80):
+    sample_rate = 22050
+    n = int(sample_rate * duration / 1000)
+    buf = bytearray()
+
+    for i in range(n):
+        t = i / sample_rate
+        val = int(127 * math.sin(2 * math.pi * freq * t) + 128)
+        buf.extend([val, val])
+
+    return pygame.mixer.Sound(buffer=bytes(buf))
+
+STEP_SOUND = generate_beep(900, 60)
+HALT_SOUND = generate_beep(250, 220)
 
 WIDTH, HEIGHT = 1600, 920
 SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
@@ -41,10 +52,6 @@ FONT_BODY = pygame.font.SysFont("consolas", 20)
 FONT_SMALL = pygame.font.SysFont("consolas", 16)
 FONT_TAPE = pygame.font.SysFont("consolas", 34, bold=True)
 FONT_BUTTON = pygame.font.SysFont("segoeui", 20, bold=True)
-
-# =========================================================
-# THEMES
-# =========================================================
 
 THEMES = {
     "dark": {
@@ -86,10 +93,6 @@ THEMES = {
 }
 
 current_theme_name = "dark"
-
-# =========================================================
-# HELPERS
-# =========================================================
 
 def T():
     return THEMES[current_theme_name]
@@ -160,10 +163,6 @@ def count_ones(config):
     current = config["symbol"]
     return left.count('1') + right.count('1') + (1 if current == '1' else 0)
 
-# =========================================================
-# UI COMPONENTS
-# =========================================================
-
 class Particle:
     def __init__(self, x, y, color):
         self.x = x + random.uniform(-10, 10)
@@ -214,10 +213,6 @@ class Button:
     def clicked(self, pos):
         return self.rect.collidepoint(pos)
 
-# =========================================================
-# VISUALIZER
-# =========================================================
-
 class TMVisualizer:
     def __init__(self):
         self.visible_cells = 13
@@ -235,6 +230,15 @@ class TMVisualizer:
         self.center_x = WIDTH // 2
         self.head_draw_x = self.center_x
         self.target_head_draw_x = self.center_x
+
+        self.zoom = 1.0
+        self.highlight_timer = 0
+        self.last_written_index = None
+
+        self.export_frames = False
+        self.frame_id = 0
+
+        self.presentation_mode = False
 
         self.buttons = [
             Button((60, 780, 140, 70), "STEP", (90, 220, 255), "SPACE"),
@@ -331,9 +335,19 @@ class TMVisualizer:
             if self.halted:
                 self.spawn_particles(self.center_x, self.tape_y - 40, T()["warn"], n=28)
 
+            if self.halted:
+                HALT_SOUND.play()
+            else:
+                STEP_SOUND.play()
+
+            self.highlight_timer = 15
+            self.last_written_index = head_before
+
         except StopIteration:
             self.halted = True
             self.status = "HALTED"
+            
+            HALT_SOUND.play()
 
     def save_screenshot(self):
         filename = f"tm_visualizer_shot_{pygame.time.get_ticks()}.png"
@@ -351,12 +365,14 @@ class TMVisualizer:
         if self.auto_run and not self.halted and now - self.last_auto_tick >= self.auto_delay:
             self.perform_step()
             self.last_auto_tick = now
+        
+        if self.highlight_timer > 0:
+            self.highlight_timer -= 1
 
     def draw_background(self):
         gradient_bg(SCREEN, T()["bg1"], T()["bg2"])
         draw_grid(SCREEN)
 
-        # soft ambient glows
         draw_glow(SCREEN, (220, 110), T()["accent"], radius=120, alpha=26, layers=5)
         draw_glow(SCREEN, (WIDTH - 180, 160), T()["head"], radius=140, alpha=20, layers=5)
 
@@ -369,7 +385,7 @@ class TMVisualizer:
         draw_text(SCREEN, info, FONT_H2, T()["muted"], (64, 96))
 
     def draw_left_panel(self):
-        rect = pygame.Rect(36, 170, 380, 570)
+        rect = pygame.Rect(36, 170, 360, 570)
         glass_panel(SCREEN, rect, T()["panel"], T()["border"], radius=28)
 
         draw_text(SCREEN, "Machine Info", FONT_H1, T()["accent"], (58, 192))
@@ -394,7 +410,7 @@ class TMVisualizer:
         draw_text(SCREEN, "ENTER  auto-run", FONT_SMALL, T()["muted"], (58, 720))
 
     def draw_right_panel(self):
-        rect = pygame.Rect(WIDTH - 410, 170, 374, 570)
+        rect = pygame.Rect(WIDTH - 400, 170, 360, 570)
         glass_panel(SCREEN, rect, T()["panel"], T()["border"], radius=28)
 
         draw_text(SCREEN, "Recent History", FONT_H1, T()["accent"], (WIDTH - 388, 192))
@@ -439,7 +455,7 @@ class TMVisualizer:
         draw_text(SCREEN, f"max={max(vals)}", FONT_SMALL, T()["muted"], (rect.x + rect.width - 70, rect.y + 6))
 
     def draw_tape_panel(self):
-        rect = pygame.Rect(440, 170, WIDTH - 880, 570)
+        rect = pygame.Rect(420, 170, WIDTH - 840, 570)
         glass_panel(SCREEN, rect, T()["panel"], T()["border"], radius=34)
 
         draw_text(SCREEN, "Tape", FONT_H1, T()["accent"], (466, 192))
@@ -451,16 +467,26 @@ class TMVisualizer:
 
         for i in range(self.visible_cells):
             idx = start_idx + i
-            cell_center_x = int(self.head_draw_x + (i - self.visible_cells // 2) * self.cell_w)
+            cell_center_x = int(self.head_draw_x + (i - self.visible_cells // 2) * self.cell_w * self.zoom)
             cell_center_y = self.tape_y
+            cell_w = int(self.cell_w * self.zoom)
+            cell_h = int(self.cell_h * self.zoom)
 
             val = tape[idx] if 0 <= idx < len(tape) else BLANK
             is_head = (idx == head_idx)
 
+            if self.highlight_timer > 0 and idx == self.last_written_index:
+                pygame.draw.rect(
+                    SCREEN,
+                    (255, 255, 80),
+                    (cell_center_x - cell_w//2, cell_center_y - cell_h//2, cell_w, cell_h),
+                    4,
+                    border_radius=18
+                )
+
             color = T()["one"] if val == '1' else T()["zero"]
 
-            # cell shadow
-            shadow = pygame.Surface((self.cell_w + 18, self.cell_h + 18), pygame.SRCALPHA)
+            shadow = pygame.Surface((cell_w + 18, cell_h + 18), pygame.SRCALPHA)
             round_rect(shadow, pygame.Rect(10, 10, self.cell_w - 4, self.cell_h - 2), T()["shadow"], radius=24)
             SCREEN.blit(shadow, (cell_center_x - self.cell_w // 2 - 1, cell_center_y - self.cell_h // 2 + 6))
 
@@ -490,11 +516,7 @@ class TMVisualizer:
                 )
                 draw_text(SCREEN, "HEAD", FONT_SMALL, T()["head"], (cell_center_x, cell_center_y - 126), center=True)
 
-        draw_text(
-            SCREEN,
-            "Interactive neon tape • glassmorphism panels • live transition tracking",
-            FONT_SMALL, T()["muted"], (WIDTH // 2, 676), center=True
-        )
+        
 
         for p in self.particles:
             p.draw(SCREEN)
@@ -511,6 +533,17 @@ class TMVisualizer:
             FONT_SMALL, T()["muted"], (WIDTH - 470, 804)
         )
 
+    def export_frame(self):
+        if not self.export_frames:
+            return
+
+        os.makedirs("frames", exist_ok=True)
+
+        filename = f"frames/frame_{self.frame_id:05d}.png"
+        pygame.image.save(SCREEN, filename)
+
+        self.frame_id += 1
+
     def draw(self, mouse_pos):
         self.draw_background()
         self.draw_header()
@@ -520,10 +553,7 @@ class TMVisualizer:
         self.draw_buttons(mouse_pos)
         self.draw_footer()
         pygame.display.flip()
-
-# =========================================================
-# MAIN
-# =========================================================
+        self.export_frame()
 
 def main():
     global current_theme_name
@@ -554,6 +584,14 @@ def main():
                     vis.reset_machine()
                 elif event.key == pygame.K_s:
                     vis.save_screenshot()
+                elif event.key == pygame.K_EQUALS:
+                    vis.zoom = min(2.5, vis.zoom + 0.1)
+                elif event.key == pygame.K_MINUS:
+                    vis.zoom = max(0.6, vis.zoom - 0.1)
+                elif event.key == pygame.K_g:
+                    vis.export_frames = not vis.export_frames
+                elif event.key == pygame.K_p:
+                    vis.presentation_mode = not vis.presentation_mode
 
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if vis.buttons[0].clicked(mouse_pos):
