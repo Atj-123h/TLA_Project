@@ -19,12 +19,32 @@ class GliderLogicGates:
     """
 
     
-    _GLIDER_SE = [(0, 1), (1, 2), (2, 0), (2, 1), (2, 2)]
+    GLIDER_SE = [(0, 1), (1, 2), (2, 0), (2, 1), (2, 2)]
 
-    _GLIDER_SW = [(0, 1), (1, 0), (2, 0), (2, 1), (2, 2)]
+    GLIDER_SW = [(0, 1), (1, 0), (2, 0), (2, 1), (2, 2)]
 
-    _GLIDER_NW = [(0, 0), (0, 1), (0, 2), (1, 0), (2, 1)]
+    GLIDER_NW = [(0, 0), (0, 1), (0, 2), (1, 0), (2, 1)]
 
+    def place_glider(self, grid, shape, anchor_r, anchor_c):
+        
+        for i, j in shape:
+            r, c = anchor_r + i, anchor_c + j
+            if 0 <= r < grid.shape[0] and 0 <= c < grid.shape[1]:
+                grid[r, c] = 1
+    
+    def cells_in_window(self, grid, row, col, window):
+        
+        r0 = max(0, row - window)
+        r1 = min(grid.shape[0], row + window + 1)
+        c0 = max(0, col - window)
+        c1 = min(grid.shape[1], col + window + 1)
+        return int(np.sum(grid[r0:r1, c0:c1]))
+
+    AND_ANCHOR_A  = (0,  0)   
+    AND_ANCHOR_B  = (4, 20)   
+    AND_OUTPUT    = (15, 12)  
+    AND_STEPS     = 80        
+    AND_THRESHOLD = 4 
     def setup_and_gate(self, grid_size=50, input_a_present=False, input_b_present=False):
         """
         Set up the Game of Life grid for an AND gate.
@@ -40,16 +60,16 @@ class GliderLogicGates:
         GOL = GameOfLife(grid_size)
 
         if input_a_present:
-            row_a, col_a = 2, 2
-            for i, j in self._GLIDER_SE:
-                GOL.grid[row_a + i, col_a + j] = 1
-
+            self.place_glider(GOL.grid, self.GLIDER_SE, *self.AND_ANCHOR_A)
         if input_b_present:
-            row_b, col_b = 2, 22
-            for i, j in self._GLIDER_SW:
-                GOL.grid[row_b + i, col_b + j] = 1
-
+            self.place_glider(GOL.grid, self.GLIDER_SW, *self.AND_ANCHOR_B)
         return GOL
+
+
+    NOT_CTRL_ANCHOR = (2,  2)   
+    NOT_INP_ANCHOR  = (20, 20) 
+    NOT_OUTPUT      = (18, 18)  
+    NOT_STEPS       = 60  
 
     def setup_not_gate(self, grid_size=40, input_a_present=False):
         """
@@ -64,14 +84,11 @@ class GliderLogicGates:
         """
         GOL = GameOfLife(grid_size)
 
-        row, col = 2, 2
-        for i, j in self._GLIDER_SE:
-            GOL.grid[row + i, col + j] = 1
+        self.place_glider(GOL.grid, self.GLIDER_SE, *self.NOT_CTRL_ANCHOR)
 
         
         if input_a_present:
-            for i, j in self._GLIDER_NW:
-                GOL.grid[28 + i, 28 + j] = 1
+            self.place_glider(GOL.grid, self.GLIDER_NW, *self.NOT_INP_ANCHOR)
 
         return GOL
 
@@ -88,24 +105,12 @@ class GliderLogicGates:
         """
         # Student TODO: Evolve simulation and evaluate output
         
-        if not (input_a_present and input_b_present):
-            return False
-
-        
         GOL = self.setup_and_gate(50, input_a_present, input_b_present)
-        for _ in range(60):
+        for _ in range(self.AND_STEPS):
             GOL.evolve()
 
-        output_row, output_col = 15, 12
-        window = 4  
- 
-        r_start = max(0, output_row - window)
-        r_end   = min(GOL.grid.shape[0], output_row + window + 1)
-        c_start = max(0, output_col - window)
-        c_end   = min(GOL.grid.shape[1], output_col + window + 1)
- 
-        output_region = GOL.grid[r_start:r_end, c_start:c_end]
-        return int(np.sum(output_region)) >= 4 
+        live = self.cells_in_window(GOL.grid, *self.AND_OUTPUT, window=4)
+        return live >= self.AND_THRESHOLD
 
     def run_not_gate(self, input_a_present):
         """
@@ -118,19 +123,11 @@ class GliderLogicGates:
             input_a_present (bool): Input A state.
         """
         GOL = self.setup_not_gate(40, input_a_present)
-        for _ in range(60):
+        for _ in range(self.NOT_STEPS):
             GOL.evolve()
-
-        output_row, output_col = 20, 20
-        window = 6
- 
-        r_start = max(0, output_row - window)
-        r_end   = min(GOL.grid.shape[0], output_row + window + 1)
-        c_start = max(0, output_col - window)
-        c_end   = min(GOL.grid.shape[1], output_col + window + 1)
- 
-        output_region = GOL.grid[r_start:r_end, c_start:c_end]
-        return int(np.sum(output_region)) > 0
+            
+        live = self.cells_in_window(GOL.grid, *self.NOT_OUTPUT, window=5)
+        return live > 0
 
 
 if __name__ == "__main__":
