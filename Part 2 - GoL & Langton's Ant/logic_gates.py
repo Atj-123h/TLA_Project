@@ -120,7 +120,7 @@ class GliderLogicGates:
             input_a_present (bool): Input A state.
 
         Returns:
-            input_a_present (bool): Input A state.
+            bool: True if output is active, False otherwise.
         """
         GOL = self.setup_not_gate(40, input_a_present)
         for _ in range(self.NOT_STEPS):
